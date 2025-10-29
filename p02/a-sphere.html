@@ -4,10 +4,13 @@
     <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script> 
   </head>
   <body>
-	<!--  <script src="../js/aframe.min.js"></script> -->
+	
+    <a-assets>
+        <img id="bricks" src="http://localhost:8000/p02/IMAGES/brick_diffuse.jpg" crossorigin="anonymous">
+      </a-assets>
     <a-scene>
       <a-sphere  id="PGB sphere" position="0 2 -1.5" wireframe="false" rotation="0 0 0" 
-	  src="./IMAGES/brick_diffuse.jpg"
+	        src="#bricks"
 	  ></a-sphere>
     </a-scene>
   </body>
