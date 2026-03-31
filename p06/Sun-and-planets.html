@@ -71,6 +71,43 @@
                 animation="property: rotation; to: 0 360 0; loop: true; dur: 2000"
                 orbit="radius: 1.0; speed: 1.2; centerX: 0; centerY: 2; centerZ: -5"></a-sphere>
 
+        <!-- Orbit Lines -->
+
+       <!-- Planet 4 orbit (radius 1.0) -->
+       <a-ring position="0 2 -5"
+        radius-inner="0.98"
+        radius-outer="1.0"
+        rotation="-90 0 0"
+        material="color: white; opacity: 0.3; transparent: true"
+        segments-theta="128"></a-ring>
+
+       <!-- Earth orbit (radius 1.5) -->
+        <a-ring position="0 2 -5"
+        radius-inner="1.48"
+        radius-outer="1.5"
+        rotation="-90 0 0"
+        material="color: white; opacity: 0.3; transparent: true"
+        segments-theta="128"></a-ring>
+
+       <!-- Planet 2 orbit (radius 2.5) -->
+        <a-ring position="0 2 -5"
+        radius-inner="2.48"
+        radius-outer="2.5"
+        rotation="-90 0 0"
+        material="color: white; opacity: 0.3; transparent: true"
+        segments-theta="128"></a-ring>
+
+     <!-- Planet 3 orbit (radius 3.5) -->
+      <a-ring position="0 2 -5"
+        radius-inner="3.48"
+        radius-outer="3.5"
+        rotation="-90 0 0"
+        material="color: white; opacity: 0.3; transparent: true"
+        segments-theta="128"></a-ring>
+
+
+         
+
 
       <!-- Camera and Lighting -->
       <a-camera position="0 1.6 0"></a-camera>
