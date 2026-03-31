@@ -27,8 +27,8 @@
         document.addEventListener('DOMContentLoaded', () => {
           const isLocal = ['localhost','127.0.0.1','[::1]'].includes(location.hostname);
           const src = isLocal
-            ? 'http://localhost:8000/p01/IMAGES/heic2007a.jpg'
-            : './IMAGES/heic2007a.jpg';
+            ? 'http://localhost:8000/p06/heic2007a.jpg'
+            : './heic2007a.jpg';
 
           const img = document.getElementById('nebula');
           img.setAttribute('src', src);        // set it
@@ -78,11 +78,9 @@
       <a-sphere id="sun"
                 position="0 2 -5"
                 radius="0.6"
-                animation__color1="property: material.color; from: orange; to: yellow; dur: 2000; loop: true; dir: alternate; easing: easeInOutSine"
-                animation__emissive1="property: material.emissive; from: orange; to: yellow; dur: 2000; loop: true; dir: alternate; easing: easeInOutSine"
-                animation__color2="property: material.color; from: yellow; to: #ff4500; dur: 3000; delay: 2000; loop: true; dir: alternate; easing: easeInOutSine"
-                animation__emissive2="property: material.emissive; from: yellow; to: #ff4500; dur: 3000; delay: 2000; loop: true; dir: alternate; easing: easeInOutSine"
-
+                animation="property: material.color; from: orange; to: yellow; loop: true; dur: 2000; easing: easeInOutSine; dir: alternate"
+                animation__emissive="property: material.emissive; from: orange; to: yellow; loop: true; dur: 2000; easing: easeInOutSine; dir: alternate"
+                animation__intensity="property: material.emissiveIntensity; from: 0.3; to: 0.8; loop: true; dur: 2000; easing: easeInOutSine; dir: alternate" 
                 material="emissive: orange; emissiveIntensity: 0.5"></a-sphere>
 
       <!-- Orbiting Earth -->
