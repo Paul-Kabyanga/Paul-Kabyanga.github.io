@@ -23,6 +23,27 @@
           this.el.object3D.position.z = this.data.centerZ + this.data.radius * Math.sin(this.angle);
         }
       });
+
+
+          AFRAME.registerComponent('color-cycle', {
+       schema: {
+        colors: {type: 'array', default: ['orange', 'yellow', '#ff4500', '#ffcc00', '#ff6600']},
+        speed:  {type: 'number', default: 2000}
+       },
+      init: function () {
+       this.colorIndex = 0;
+       this.lastSwitch = 0;
+       },
+        tick: function (time) {
+       if (time - this.lastSwitch > this.data.speed) {
+        this.colorIndex = (this.colorIndex + 1) % this.data.colors.length;
+        let newColor = this.data.colors[this.colorIndex];
+        this.el.setAttribute('material', 'color', newColor);
+        this.el.setAttribute('material', 'emissive', newColor);
+        this.lastSwitch = time;
+       }
+      }
+     });
     </script>
   </head>
   <body>
@@ -48,6 +69,7 @@
                 radius="0.3"
                 src="#earth"
                 animation="property: rotation; to: 0 360 0; loop: true; dur: 4000"
+                color-cycle="colors: orange, yellow, #ff4500, #ffcc00, #ff6600; speed: 2000"
                 orbit="radius: 2; speed: 0.8; centerX: 0; centerY: 2; centerZ: -5"></a-sphere>
 
 
@@ -70,41 +92,6 @@
                 src = "#ven"
                 animation="property: rotation; to: 0 360 0; loop: true; dur: 2000"
                 orbit="radius: 1.0; speed: 1.2; centerX: 0; centerY: 2; centerZ: -5"></a-sphere>
-
-        <!-- Orbit Lines -->
-
-       <!-- Planet 4 orbit (radius 1.0) -->
-      <a-ring position="0 2 -5"
-         radius-inner="0.98"
-         radius-outer="1.0"
-         rotation="-90 0 0"
-         material="color: white; opacity: 0.3; transparent: true"
-         segments-theta="128"></a-ring>
-
-       <!-- Earth orbit (radius 1.5) -->
-      <a-ring position="0 2 -5"
-         radius-inner="1.48"
-         radius-outer="1.5"
-         rotation="-90 0 0"
-         material="color: white; opacity: 0.3; transparent: true"
-         segments-theta="128"></a-ring>
-
-       <!-- Planet 2 orbit (radius 2.5) -->
-      <a-ring position="0 2 -5"
-         radius-inner="2.48"
-         radius-outer="2.5"
-         rotation="-90 0 0"
-         material="color: white; opacity: 0.3; transparent: true"
-         segments-theta="128"></a-ring>
-
-     <!-- Planet 3 orbit (radius 3.5) -->
-      <a-ring position="0 2 -5"
-         radius-inner="3.48"
-         radius-outer="3.5"
-         rotation="-90 0 0"
-         material="color: white; opacity: 0.3; transparent: true"
-         segments-theta="128"></a-ring>
-
 
          
 
