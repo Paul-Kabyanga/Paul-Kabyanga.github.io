@@ -58,10 +58,15 @@
       </a-assets>
 
       <!-- Center Sun (fixed) -->
+        <!-- color-cycle="colors: orange, yellow, #ff4500, #ffcc00, #ff6600; speed: 2000" -->
       <a-sphere id="sun"
                 position="0 2 -5"
                 radius="0.6"
-                color-cycle="colors: orange, yellow, #ff4500, #ffcc00, #ff6600; speed: 2000"
+                animation__color1="property: material.color; from: orange; to: yellow; dur: 2000; loop: true; dir: alternate; easing: easeInOutSine"
+                animation__emissive1="property: material.emissive; from: orange; to: yellow; dur: 2000; loop: true; dir: alternate; easing: easeInOutSine"
+                animation__color2="property: material.color; from: yellow; to: #ff4500; dur: 3000; delay: 2000; loop: true; dir: alternate; easing: easeInOutSine"
+                animation__emissive2="property: material.emissive; from: yellow; to: #ff4500; dur: 3000; delay: 2000; loop: true; dir: alternate; easing: easeInOutSine"
+
                 material="emissive: orange; emissiveIntensity: 0.5"></a-sphere>
 
       <!-- Orbiting Earth -->
