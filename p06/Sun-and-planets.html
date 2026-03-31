@@ -24,6 +24,22 @@
         }
       });
 
+        document.addEventListener('DOMContentLoaded', () => {
+          const isLocal = ['localhost','127.0.0.1','[::1]'].includes(location.hostname);
+          const src = isLocal
+            ? 'http://localhost:8000/p01/IMAGES/heic2007a.jpg'
+            : './IMAGES/heic2007a.jpg';
+
+          const img = document.getElementById('nebula');
+          img.setAttribute('src', src);        // set it
+
+          // once assets are ready, use it
+          document.querySelector('a-assets').addEventListener('loaded', () => {
+            document.getElementById('mySky')
+              .setAttribute('material', 'src: #nebula');
+          });
+        });
+
 
       AFRAME.registerComponent('color-cycle', {
        schema: {
@@ -98,12 +114,19 @@
                 orbit="radius: 1.0; speed: 1.2; centerX: 0; centerY: 2; centerZ: -5"></a-sphere>
 
          
-
+             
+        <a-assets>
+          <img id="nebula" crossorigin="anonymous">
+         </a-assets>
+        <a-sky id="mySky"
+          src="#nebula"	position="-2.5  0 -1.5"
+        ></a-sky>
 
       <!-- Camera and Lighting -->
       <a-camera position="0 1.6 0"></a-camera>
       <a-light type="ambient" color="#888"></a-light>
       <a-light type="directional" color="#fff" position="-1 1 1"></a-light>
+ 
 
     </a-scene>
   </body>
