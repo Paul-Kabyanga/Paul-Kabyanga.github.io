@@ -96,19 +96,21 @@
 
 
 
-      <!-- Orbiting Planet 2-->
-      <a-sphere id="planet2"
-                radius="0.4"
-                src="#mars"
-                animation="property: rotation; to: 0 360 0; loop: true; dur: 6000"
-                orbit="radius: 2.7; speed: 0.5; centerX: 0; centerY: 2; centerZ: -5"></a-sphere>
+     <!-- Orbiting Planet 2-->
+      <a-entity orbit="radius: 2.7; speed: 0.5; centerX: 0; centerY: 2; centerZ: -5">
+        <a-sphere id="planet2" radius="0.4" src="#mars" animation="property: rotation; to: 0 360 0; loop: true; dur: 6000"></a-sphere>
+        <a-text value="Mars" position="0 0.5 0" color="white" width="3"></a-text>
+      </a-entity>
+               
 
-         <!-- Orbiting Planet 3awq-->
-      <a-sphere id="planet3"
-                radius="0.55"
-                src="#plan3"
-                animation="property: rotation; to: 0 360 0; loop: true; dur: 8000"
-                orbit="radius: 3.5; speed: 0.3; centerX: 0; centerY: 2; centerZ: -5"></a-sphere>
+
+      <!-- Orbiting Planet 3awq-->
+      <a-entity orbit="radius: 3.5; speed: 0.3; centerX: 0; centerY: 2; centerZ: -5">
+         <a-sphere id="planet3" radius="0.55" src="#plan3" animation="property: rotation; to: 0 360 0; loop: true; dur: 8000"></a-sphere>
+         <a-text value="Jupiter" position="0 0.5 0" color="white" width="3"></a-text>
+      </a-entity>
+
+
 
       <a-sphere id="planet4"
                 radius="0.15"
