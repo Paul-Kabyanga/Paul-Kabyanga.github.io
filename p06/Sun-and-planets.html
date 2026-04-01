@@ -84,13 +84,9 @@
                 material="emissive: orange; emissiveIntensity: 0.5"></a-sphere>
 
       <!-- Orbiting Earth -->
-      <a-entity orbit="radius: 2; speed: 0.8; centerX: 0; centerY: 2; centerZ: -5">
-         <a-sphere id="sphere"
-                radius="0.3"
-                src="#earth"
-                animation="property: rotation; to: 0 360 0; loop: true; dur: 4000"
-                orbit="radius: 2; speed: 0.8; centerX: 0; centerY: 2; centerZ: -5"></a-sphere>
-         <a-text value="Earth" position="0 0.5 0" text="align: center" color="white" width="3" look-at="[camera]"></a-text>
+      <a-entity orbit="radius: 2; speed: 0.8; centerX: 0; centerY: 2; centerZ: -5"> 
+        <a-text value="Earth" position="0 0.5 0" color="white" width="3"></a-text>
+        <a-sphere id="sphere" radius="0.3" src="#earth" animation="property: rotation; to: 0 360 0; loop: true; dur: 4000" orbit="radius: 2; speed: 0.8; centerX: 0; centerY: 2; centerZ: -5"></a-sphere>
       </a-entity>
 
 
