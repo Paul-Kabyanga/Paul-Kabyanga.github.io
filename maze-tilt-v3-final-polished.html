@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MAZE TILT</title>
+
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@700;900&display=swap');
+
+    :root {
+  --col-bg:#ffffff;
+  --col-accent:#333333;
+  --col-win:#008000;
+  --col-ui-bg:#eeeeee;
+  --col-border:#999999;
+}
+
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { background:#b0c497; overflow:hidden; font-family:'Times New Roman', monospace; }
+
+    /* ── HUD ── */
+    #hud {
+      position:fixed; top:0; left:0; right:0; z-index:100; pointer-events:none;
+      display:flex; justify-content:space-between; align-items:flex-start; padding:16px 20px;
+    }
+    .pill {
+      background:var(--col-ui-bg); border:1px solid var(--col-border);
+      border-radius:2px; padding:6px 16px; color:#fff; text-align:center;
+    }
+    .pill-lbl { font-size:9px; letter-spacing:3px; text-transform:uppercase; opacity:.5; }
+    .pill-val  { font-size:20px; font-weight:900; line-height:1.2; font-family: Arial, Helvetica, sans-serif; }
+
+    #level-pill {
+      background:var(--col-ui-bg); border:1px solid var(--col-border);
+      border-radius:2px; padding:6px 16px; color:#fff; text-align:center;
+    }
+    #level-pill .pill-lbl { font-size:9px; letter-spacing:3px; opacity:.5; }
+    #level-pill .pill-val  { font-size:16px; font-family: Arial, Helvetica, sans-serif; color: var(--col-accent); }
+
+    /* ── Tilt Indicator ── */
+    #tilt-ind {
+      position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
+      z-index:100; pointer-events:none; display:none;
+      flex-direction:column; align-items:center; gap:5px;
+    }
+    #tilt-circle {
+      width:68px; height:68px; border-radius:50%;
+      border:1.5px solid rgba(255,255,255,0.25);
+      position:relative; background:rgba(0,0,0,0.45);
+    }
+    #tilt-dot {
+      width:13px; height:13px; border-radius:50%; background:var(--col-accent);
+      position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    }
+    #tilt-lbl { font-size:9px; letter-spacing:3px; color:rgba(255,255,255,0.35); text-transform:uppercase; }
+
+    #flash { position:fixed; inset:0; opacity:0; pointer-events:none; z-index:99; transition:opacity 0.08s; }
+
+    #win-banner {
+      position:fixed; inset:0; z-index:150; pointer-events:none;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      opacity:0; transition:opacity 0.4s; gap:12px;
+    }
+    #win-banner.show { opacity:1; }
+    .win-text {
+      font-size:clamp(28px,9vw,54px); font-weight:900; letter-spacing:8px;
+      color:var(--col-win); text-shadow:none;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    .win-sub { font-size:14px; letter-spacing:3px; color:rgba(255,255,255,0.6); }
+
+    #tbar-wrap { position:fixed; top:0; left:0; right:0; height:5px; background:rgba(255,255,255,.08); z-index:101; pointer-events:none; }
+    #tbar { height:100%; width:0; background:var(--col-accent); }
+
+    /* ════════════════════════════════
+       SPLASH SCREEN
+    ════════════════════════════════ */
+    #splash {
+      position:fixed; inset:0; z-index:300;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      background: radial-gradient(ellipse at center, #12122a 0%, #08080f 70%);
+      color:#fff; text-align:center; padding:32px;
+      transition:opacity 0.6s;
+    }
+    #splash.gone { opacity:0; pointer-events:none; }
+    .splash-title {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size:clamp(44px,14vw,80px); font-weight:900; letter-spacing:12px;
+      line-height:0.9; margin-bottom:6px;
+      background: linear-gradient(135deg, #fff 30%, var(--col-accent) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .splash-subtitle {
+      font-size:10px; letter-spacing:6px; opacity:.4; margin-bottom:40px; text-transform:uppercase;
+    }
+    .splash-creds {
+      margin-bottom:36px; border:1px solid var(--col-border);
+      border-radius:2px; padding:14px 28px;
+      background:rgba(255,255,255,0.03); line-height:2;
+    }
+    .splash-creds .cred-row { font-size:10px; letter-spacing:2px; opacity:.45; }
+    .splash-creds .cred-val { font-size:13px; letter-spacing:1px; opacity:.8; }
+    .splash-enter-btn {
+      background:var(--col-accent); color:#000; border:none; border-radius:2px;
+      font-family: monospace; font-size:12px; letter-spacing:4px;
+      text-transform:uppercase; font-weight:bold; padding:14px 48px;
+      cursor:pointer; transition:transform .15s, background .2s;
+    }
+    .splash-enter-btn:hover  {  background:#ffe899; }
+    .splash-enter-btn:active {  }
+
+    /* ════════════════════════════════
+       SETUP SCREEN
+    ════════════════════════════════ */
+    #setup-overlay {
+      position:fixed; inset:0; z-index:290;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      background: #dddddd;
+      color:#fff; text-align:center; padding:32px;
+      transition:opacity 0.4s;
+    }
+    #setup-overlay.gone { opacity:0; pointer-events:none; }
+    .setup-title {
+      font-family: Arial, Helvetica, sans-serif; font-size:22px; letter-spacing:6px;
+      margin-bottom:32px; opacity:.9;
+    }
+    .setup-section { margin-bottom:28px; width:100%; max-width:320px; }
+    .setup-label { font-size:9px; letter-spacing:4px; opacity:.4; margin-bottom:10px; text-transform:uppercase; }
+    .setup-options { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+    .setup-opt {
+      background:rgba(255,255,255,0.05); border:1px solid var(--col-border);
+      border-radius:2px; padding:10px 20px; cursor:pointer; font-family: monospace;
+      font-size:12px; letter-spacing:2px; color:#fff; transition:all .15s;
+    }
+    .setup-opt:hover  { background:rgba(255,255,255,0.1); border-color:rgba(255,255,255,0.3); }
+    .setup-opt.active { background:rgba(255,209,102,0.15); border-color:var(--col-accent); color:var(--col-accent); }
+    .setup-start-btn {
+      background:#fff; color:#000; border:none; border-radius:2px;
+      font-family: monospace; font-size:12px; letter-spacing:4px;
+      text-transform:uppercase; font-weight:bold; padding:14px 44px;
+      cursor:pointer; transition:transform .15s, background .2s; margin-top:8px;
+    }
+    .setup-start-btn:hover  { background:var(--col-accent);  }
+    .setup-start-btn:active {  }
+
+    /* ════════════════════════════════
+       GAME OVERLAY
+    ════════════════════════════════ */
+    #overlay {
+      position:fixed; inset:0; z-index:200;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      background:#dddddd; color:#fff; text-align:center; padding:32px;
+      transition:opacity 0.4s;
+    }
+    #overlay.gone { opacity:0; pointer-events:none; }
+    .ov-title { font-size:clamp(28px,9vw,48px); font-weight:900; letter-spacing:8px; line-height:1.1; margin-bottom:8px; font-family: Arial, Helvetica, sans-serif; }
+    .ov-sub   { font-size:11px; letter-spacing:2px; opacity:.45; margin-bottom:10px; max-width:300px; line-height:2; }
+    .ov-hint  { font-size:10px; letter-spacing:2px; opacity:.3;  margin-bottom:36px; max-width:280px; line-height:2; }
+    .ov-rlbl  { font-size:11px; letter-spacing:3px; opacity:.55; margin-bottom:4px; display:none; }
+    .ov-rval  { font-size:48px; font-weight:900; margin-bottom:10px; display:none; font-family: Arial, Helvetica, sans-serif; color:var(--col-accent); }
+    .ov-level-badge {
+      font-size:10px; letter-spacing:4px; opacity:.5; margin-bottom:28px;
+      border:1px solid var(--col-border); border-radius:20px; padding:4px 14px; display:none;
+    }
+    #startbtn {
+      background:#fff; color:#000; border:none; border-radius:2px;
+      font-family: monospace; font-size:12px; letter-spacing:4px;
+      text-transform:uppercase; font-weight:bold; padding:14px 44px;
+      cursor:pointer; transition:transform .15s, background .2s;
+    }
+    #startbtn:hover  { background:var(--col-accent);  }
+    #startbtn:active {  }
+
+    /* ════════════════════════════════
+       SCOREBOARD
+    ════════════════════════════════ */
+    #scoreboard {
+      position:fixed; inset:0; z-index:250;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      background:#dddddd; color:#fff; text-align:center; padding:32px;
+      opacity:0; pointer-events:none; transition:opacity 0.4s;
+    }
+    #scoreboard.show { opacity:1; pointer-events:all; }
+    .sb-title { font-family: Arial, Helvetica, sans-serif; font-size:24px; letter-spacing:8px; margin-bottom:28px; color:var(--col-accent); }
+    .sb-table { width:100%; max-width:340px; margin-bottom:28px; }
+    .sb-row {
+      display:flex; justify-content:space-between; align-items:center;
+      padding:10px 0; border-bottom:1px solid var(--col-border);
+      font-size:13px; letter-spacing:1px;
+    }
+    .sb-row:last-child { border-bottom:none; }
+    .sb-rank { font-size:10px; opacity:.4; width:28px; text-align:left; }
+    .sb-name { flex:1; text-align:left; opacity:.8; }
+    .sb-time { font-family: Arial, Helvetica, sans-serif; font-size:14px; color:var(--col-accent); }
+    .sb-level-tag { font-size:9px; opacity:.4; letter-spacing:2px; }
+    .sb-empty { opacity:.3; font-size:11px; letter-spacing:2px; padding:20px 0; }
+    .sb-close-btn {
+      background:rgba(255,255,255,0.08); border:1px solid var(--col-border);
+      border-radius:2px; padding:10px 32px; color:#fff; cursor:pointer;
+      font-family: monospace; font-size:11px; letter-spacing:3px;
+      transition:all .15s; text-transform:uppercase;
+    }
+    .sb-close-btn:hover { background:rgba(255,255,255,0.15); }
+
+    #sb-btn {
+      position:fixed; bottom:20px; right:20px; z-index:120;
+      background:var(--col-ui-bg); border:1px solid var(--col-border);
+      border-radius:2px; padding:8px 14px; color:#fff; cursor:pointer;
+      font-family: monospace; font-size:10px; letter-spacing:2px;
+      pointer-events:all; transition:all .15s; text-transform:uppercase; display:none;
+    }
+    #sb-btn:hover { background:rgba(255,255,255,0.1); }
+  </style>
+</head>
+<body>
+
+<div id="tbar-wrap"><div id="tbar"></div></div>
+
+<div id="hud">
+  <div class="pill"><div class="pill-lbl">Time</div><div class="pill-val" id="time-val">0.0s</div></div>
+  <div id="level-pill"><div class="pill-lbl">Level</div><div class="pill-val" id="level-val">1</div></div>
+  <div class="pill"><div class="pill-lbl">Best</div><div class="pill-val" id="best-val">--</div></div>
+</div>
+
+<div id="tilt-ind">
+  <div id="tilt-circle"><div id="tilt-dot"></div></div>
+  <div id="tilt-lbl">Head Tilt</div>
+</div>
+
+<div id="flash"></div>
+
+<div id="win-banner">
+  <div class="win-text" id="win-text">LEVEL CLEAR!</div>
+  <div class="win-sub" id="win-sub"></div>
+</div>
+
+<!-- ════════════════════════════════
+     SPLASH SCREEN
+     ← Replace credentials below →
+════════════════════════════════ -->
+<div id="splash">
+  <div class="splash-title">MAZE<br>TILT</div>
+  <div class="splash-subtitle">A-Frame Head Tilt Physics Game</div>
+
+  <!-- ╔══════════════════════════════════╗
+       ║   PLACEHOLDER — REPLACE BELOW   ║
+       ╚══════════════════════════════════╝ -->
+  <div class="splash-creds">
+    <div class="cred-row">CREATED BY</div>
+    <div class="cred-val">[ Your Name Here ]</div>
+    <div class="cred-row" style="margin-top:8px;">COURSE / ASSIGNMENT</div>
+    <div class="cred-val">[ Course Name · Assignment Title ]</div>
+    <div class="cred-row" style="margin-top:8px;">DATE</div>
+    <div class="cred-val">[ Date ]</div>
+  </div>
+
+  <button class="splash-enter-btn" id="splash-btn">ENTER</button>
+</div>
+
+<!-- ════════════════════════════════
+     SETUP SCREEN
+════════════════════════════════ -->
+<div id="setup-overlay" class="gone">
+  <div class="setup-title">SETUP</div>
+
+  <div class="setup-section">
+    <div class="setup-label">Tilt Sensitivity</div>
+    <div class="setup-options">
+      <div class="setup-opt" data-group="sens" data-val="0.5">Low</div>
+      <div class="setup-opt active" data-group="sens" data-val="0.75">Medium</div>
+      <div class="setup-opt" data-group="sens" data-val="1.1">High</div>
+    </div>
+  </div>
+
+  <div class="setup-section">
+    <div class="setup-label">Ball Speed</div>
+    <div class="setup-options">
+      <div class="setup-opt" data-group="speed" data-val="14">Slow</div>
+      <div class="setup-opt active" data-group="speed" data-val="20">Normal</div>
+      <div class="setup-opt" data-group="speed" data-val="28">Fast</div>
+    </div>
+  </div>
+
+  <div class="setup-section">
+    <div class="setup-label">Start Level</div>
+    <div class="setup-options">
+      <div class="setup-opt active" data-group="startlevel" data-val="1">Level 1</div>
+      <div class="setup-opt" data-group="startlevel" data-val="2">Level 2</div>
+    </div>
+  </div>
+
+  <button class="setup-start-btn" id="setup-done-btn">START GAME</button>
+</div>
+
+<!-- ════════════════════════════════
+     GAME OVERLAY (between levels / play again)
+════════════════════════════════ -->
+<div id="overlay" class="gone">
+  <div class="ov-title" id="ov-title">MAZE<br>TILT</div>
+  <div class="ov-sub" id="ov-sub">Tilt your head to rotate the maze.<br>Guide the ball to the green goal.</div>
+  <div class="ov-hint" id="ov-hint">
+    Mobile: tilt your device / head<br>
+    Desktop: click &amp; drag to tilt
+  </div>
+  <div class="ov-rlbl" id="ov-rlbl">Your time</div>
+  <div class="ov-rval" id="ov-rval"></div>
+  <div class="ov-level-badge" id="ov-level-badge"></div>
+  <button id="startbtn">START</button>
+</div>
+
+<!-- ════════════════════════════════
+     SCOREBOARD
+════════════════════════════════ -->
+<div id="scoreboard">
+  <div class="sb-title">SCOREBOARD</div>
+  <div class="sb-table" id="sb-table">
+    <div class="sb-empty">No runs yet. Complete both levels to appear here!</div>
+  </div>
+  <button class="sb-close-btn" id="sb-close-btn">CLOSE</button>
+</div>
+<button id="sb-btn">🏆 SCORES</button>
+
+<!-- ════════════════════════════════
+     A-FRAME SCENE
+════════════════════════════════ -->
+<a-scene
+  id="main-scene"
+  vr-mode-ui="enabled: true"
+  renderer="antialias: true; colorManagement: true"
+  background="color: #08080f"
+  loading-screen="dotsColor: #ffd166; backgroundColor: #08080f"
+>
+
+  <!--
+  ╔══════════════════════════════════════════════╗
+  ║           PLACEHOLDER TEXTURES               ║
+  ║  Replace the src="" values with your own     ║
+  ║  image paths or URLs when ready.             ║
+  ╚══════════════════════════════════════════════╝
+
+  TEXTURE SLOTS:
+    #tex-ball   → ball surface         (512×512 sphere map)
+    #tex-floor  → maze floor           (tileable, 512×512)
+    #tex-wall   → maze walls           (tileable, 256×256)
+    #tex-goal   → goal pad             (256×256)
+    #tex-sky    → 360° sky panorama    (equirectangular, 4096×2048)
+                  → change <a-sky color=…> to <a-sky src="#tex-sky">
+  -->
+  <a-assets>
+    <img id="tex-ball" crossorigin="anonymous"
+      src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Crect width='256' height='256' fill='%23b22222'/%3E%3Ccircle cx='128' cy='128' r='110' fill='%23e63030'/%3E%3Ccircle cx='88' cy='85' r='28' fill='rgba(255,255,255,0.18)'/%3E%3Cline x1='40' y1='128' x2='216' y2='128' stroke='%23c00' stroke-width='3' opacity='0.4'/%3E%3Cline x1='128' y1='40' x2='128' y2='216' stroke='%23c00' stroke-width='3' opacity='0.4'/%3E%3Ctext x='128' y='148' font-size='26' text-anchor='middle' fill='rgba(255,255,255,0.12)' font-family='monospace'%3EBALL%3C/text%3E%3C/svg%3E"/>
+    <img id="tex-floor" crossorigin="anonymous"
+      src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Crect width='256' height='256' fill='%23181830'/%3E%3Cline x1='0' y1='64' x2='256' y2='64' stroke='%23ffffff0d' stroke-width='1'/%3E%3Cline x1='0' y1='128' x2='256' y2='128' stroke='%23ffffff0d' stroke-width='1'/%3E%3Cline x1='0' y1='192' x2='256' y2='192' stroke='%23ffffff0d' stroke-width='1'/%3E%3Cline x1='64' y1='0' x2='64' y2='256' stroke='%23ffffff0d' stroke-width='1'/%3E%3Cline x1='128' y1='0' x2='128' y2='256' stroke='%23ffffff0d' stroke-width='1'/%3E%3Cline x1='192' y1='0' x2='192' y2='256' stroke='%23ffffff0d' stroke-width='1'/%3E%3Ctext x='128' y='138' font-size='18' text-anchor='middle' fill='rgba(255,255,255,0.05)' font-family='monospace'%3EFLOOR%3C/text%3E%3C/svg%3E"/>
+    <img id="tex-wall" crossorigin="anonymous"
+      src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Crect width='256' height='256' fill='%23242448'/%3E%3Crect x='0' y='0' width='256' height='4' fill='%23ffffff0a'/%3E%3Crect x='0' y='252' width='256' height='4' fill='%23000000'/%3E%3Crect x='0' y='0' width='4' height='256' fill='%23ffffff0a'/%3E%3Ctext x='128' y='138' font-size='18' text-anchor='middle' fill='rgba(255,255,255,0.06)' font-family='monospace'%3EWALL%3C/text%3E%3C/svg%3E"/>
+    <img id="tex-goal" crossorigin="anonymous"
+      src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Crect width='256' height='256' fill='%2306d6a0'/%3E%3Ccircle cx='128' cy='128' r='100' fill='%2300b489' opacity='0.5'/%3E%3Ccircle cx='128' cy='128' r='55' fill='%2306d6a0'/%3E%3Ccircle cx='128' cy='128' r='20' fill='%23fff' opacity='0.25'/%3E%3Ctext x='128' y='148' font-size='22' text-anchor='middle' fill='rgba(0,0,0,0.3)' font-family='monospace'%3EGOAL%3C/text%3E%3C/svg%3E"/>
+    <img id="tex-sky" crossorigin="anonymous"
+      src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='32'%3E%3Crect width='64' height='32' fill='%2308080f'/%3E%3C/svg%3E"/>
+  </a-assets>
+
+  <!-- Sky — swap to src="#tex-sky" when you have a real panorama -->
+  <a-sky id="main-sky" color="#08080f"></a-sky>
+
+  <a-camera id="cam" position="0 9 0" rotation="-90 0 0"
+    look-controls="enabled: false" wasd-controls="enabled: false" fov="58">
+    <a-entity
+      cursor="fuse: true; fuseTimeout: 1200"
+      position="0 0 -1"
+      geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.02"
+      material="color: black; shader: flat">
+    </a-entity>
+  </a-camera>
+
+
+  <a-light type="ambient"     color="#99aacc" intensity="0.55"></a-light>
+  <a-light type="directional" color="#ffffff"  intensity="0.8" position="4 10 6"></a-light>
+  <a-light type="point"       color="#ffd166"  intensity="0.6" position="0 4 0" distance="14"></a-light>
+
+  <a-entity id="maze-pivot" position="0 0 0" rotation="0 0 0">
+
+    <a-plane id="maze-floor" position="0 0 0" rotation="-90 0 0" width="6" height="6"
+      src="#tex-floor" repeat="4 4" material="roughness:0.85; metalness:0.05"></a-plane>
+
+    <!-- OUTER BOUNDARY WALLS -->
+    <a-box position="0    0.3  -3.075" width="6.15" height="0.6" depth="0.15" src="#tex-wall" material="roughness:0.7"></a-box>
+    <a-box position="0    0.3   3.075" width="6.15" height="0.6" depth="0.15" src="#tex-wall" material="roughness:0.7"></a-box>
+    <a-box position="-3.075 0.3 0"     width="0.15" height="0.6" depth="6.15" src="#tex-wall" material="roughness:0.7"></a-box>
+    <a-box position=" 3.075 0.3 0"     width="0.15" height="0.6" depth="6.15" src="#tex-wall" material="roughness:0.7"></a-box>
+
+    <!--
+    ╔═══════════════════════════════════╗
+    ║   LEVEL 1 INTERIOR MAZE WALLS     ║
+    ║   Start: z=+2.4  Goal: z=-2.4    ║
+    ╚═══════════════════════════════════╝
+    Edit positions/dimensions to change the maze layout.
+    All interior walls: height=0.55, thickness=0.35
+    -->
+    <a-entity id="level1-walls">
+  <!--
+  LEVEL 1 — wide, forgiving gaps so the ball can cleanly pass through.
+  The maze still alternates left/right openings, but the openings are larger
+  than the ball’s diameter and the wall ends are pulled back a bit.
+  -->
+  <!-- H1 right gap -->
+  <a-box position="-1.0 0.275 1.8" width="4.0" height="0.55" depth="0.28" src="#tex-wall" material="roughness:0.7"></a-box>
+  <!-- H2 left gap -->
+  <a-box position="1.0 0.275 1.0" width="4.0" height="0.55" depth="0.28" src="#tex-wall" material="roughness:0.7"></a-box>
+  <!-- H3 right gap -->
+  <a-box position="-1.0 0.275 0.2" width="4.0" height="0.55" depth="0.28" src="#tex-wall" material="roughness:0.7"></a-box>
+  <!-- H4 left gap -->
+  <a-box position="1.0 0.275 -0.6" width="4.0" height="0.55" depth="0.28" src="#tex-wall" material="roughness:0.7"></a-box>
+  <!-- H5 right gap -->
+  <a-box position="-1.0 0.275 -1.4" width="4.0" height="0.55" depth="0.28" src="#tex-wall" material="roughness:0.7"></a-box>
+  <!-- H6 centre finish gate -->
+  <a-box position="-1.9 0.275 -2.1" width="1.8" height="0.55" depth="0.28" src="#tex-wall" material="roughness:0.7"></a-box>
+  <a-box position="1.9 0.275 -2.1" width="1.8" height="0.55" depth="0.28" src="#tex-wall" material="roughness:0.7"></a-box>
+</a-entity>
+
+
+<a-entity id="level2-walls" visible="false">
+
+  <!-- Complex solvable zig-zag + chambers -->
+
+  <!-- Top barrier with right gap -->
+  <a-box position="-1.0 0.275 1.8" width="4.0" height="0.55" depth="0.35" src="#tex-wall"></a-box>
+
+  <!-- Second layer (forces left) -->
+  <a-box position="1.0 0.275 1.0" width="4.0" height="0.55" depth="0.35" src="#tex-wall"></a-box>
+
+  <!-- Third layer (forces right again) -->
+  <a-box position="-1.0 0.275 0.2" width="4.0" height="0.55" depth="0.35" src="#tex-wall"></a-box>
+
+  <!-- Fourth layer (forces left again) -->
+  <a-box position="1.0 0.275 -0.6" width="4.0" height="0.55" depth="0.35" src="#tex-wall"></a-box>
+
+  <!-- Final narrowing before goal -->
+  <a-box position="0 0.275 -1.5" width="2.5" height="0.55" depth="0.35" src="#tex-wall"></a-box>
+
+  <!-- Side blockers to prevent shortcuts -->
+  <a-box position="-2.2 0.275 0.6" width="0.35" height="0.55" depth="2.5" src="#tex-wall"></a-box>
+  <a-box position="2.2 0.275 -0.6" width="0.35" height="0.55" depth="2.5" src="#tex-wall"></a-box>
+
+</a-entity>
+
+
+    <!-- START MARKER -->
+    <a-plane position="0 0.01 2.4" rotation="-90 0 0" width="0.8" height="0.8"
+             material="color:#ffd166; emissive:#ffd166; emissiveIntensity:0.5; opacity:0.9"></a-plane>
+    <a-text  value="START" position="0 0.02 2.4" rotation="-90 0 0"
+             align="center" color="#111" width="2.2"></a-text>
+
+    <!-- GOAL MARKER — uses tex-goal placeholder -->
+    <a-plane id="goal-pad" position="0 0.01 -2.4" rotation="-90 0 0" width="1.0" height="1.0"
+             src="#tex-goal" material="emissive:#06d6a0; emissiveIntensity:0.4; opacity:0.95"></a-plane>
+
+    <!-- THE BALL — uses tex-ball placeholder
+         Replace src="#tex-ball" with your own image path when ready
+         Radius set to 0.15 (diameter 0.30) to give the ball more clearance through the maze -->
+    <a-sphere id="ball" position="0 0.24 2.4" radius="0.15"
+      src="#tex-ball"
+      material="roughness:0.35; metalness:0.25; emissive:#220000; emissiveIntensity:0.08"
+      segments-height="20" segments-width="20"></a-sphere>
+
+  </a-entity>
+
+</a-scene>
+
+<script>
+/* ══════════════════════════════════════════
+   MAZE TILT — Physics + Tilt + Levels + Audio
+══════════════════════════════════════════ */
+
+/* ── Tuning (set by setup screen) ── */
+const MAX_TILT_DEG    = 28;
+const TILT_SMOOTH     = 0.1;
+const BALL_DAMPING    = 0.22;
+const BALL_FRICTION   = 0.30;
+const BALL_RESTITUTION= 0.08;
+const DWELL_STEP      = 0.20;
+const GOAL_XZ_RADIUS  = 0.55;
+const GOAL_X = 0, GOAL_Z = -2.4;
+const START_POS = { x:0, y:0.45, z:2.4 };
+
+let GRAVITY_MAG_LIVE   = 20;
+let tiltSensMultiplier = 0.75;
+
+/* ════════════════════════════════
+   SOUND EFFECTS (Web Audio placeholders)
+   ────────────────────────────────
+   To replace with real audio files:
+     const sfxWin = new Audio('sounds/win.mp3');
+     sfxWin.play();
+   Un-comment and adjust paths as needed.
+════════════════════════════════ */
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+function ensureAudio() { if (!audioCtx) audioCtx = new AudioCtx(); }
+
+/* PLACEHOLDER: ascending chime on win
+   → Replace with: new Audio('sounds/win.mp3').play() */
+function playWinSound() {
+  try {
+    ensureAudio();
+    const notes = [523, 659, 784, 1047];
+    notes.forEach((freq, i) => {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.connect(g); g.connect(audioCtx.destination);
+      o.frequency.value = freq; o.type = 'sine';
+      const t = audioCtx.currentTime + i * 0.13;
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.18, t + 0.04);
+      g.gain.linearRampToValueAtTime(0, t + 0.3);
+      o.start(t); o.stop(t + 0.35);
+    });
+  } catch(e) {}
+}
+
+/* PLACEHOLDER: thud on ball reset
+   → Replace with: new Audio('sounds/reset.mp3').play() */
+function playResetSound() {
+  try {
+    ensureAudio();
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.connect(g); g.connect(audioCtx.destination);
+    o.frequency.value = 120; o.type = 'sine';
+    const t = audioCtx.currentTime;
+    g.gain.setValueAtTime(0.2, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+    o.start(t); o.stop(t + 0.3);
+  } catch(e) {}
+}
+
+/* PLACEHOLDER: blip on level start
+   → Replace with: new Audio('sounds/start.mp3').play() */
+function playStartSound() {
+  try {
+    ensureAudio();
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.connect(g); g.connect(audioCtx.destination);
+    o.frequency.setValueAtTime(330, audioCtx.currentTime);
+    o.frequency.linearRampToValueAtTime(660, audioCtx.currentTime + 0.15);
+    o.type = 'square';
+    g.gain.setValueAtTime(0.08, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+    o.start(); o.stop(audioCtx.currentTime + 0.22);
+  } catch(e) {}
+}
+
+/* ── Level & Score state ── */
+let currentLevel = 1;
+const TOTAL_LEVELS = 2;
+let scoreEntries = [];
+
+/* ── Game state ── */
+let gameState = 'idle';
+let elapsed = 0, totalElapsed = 0, bestTime = null;
+let tiltX = 0, tiltZ = 0, targetTX = 0, targetTZ = 0;
+let won = false;
+let world, ballBody;
+
+/* ── DOM ── */
+const overlay    = document.getElementById('overlay');
+const ovTitle    = document.getElementById('ov-title');
+const ovSub      = document.getElementById('ov-sub');
+const ovRlbl     = document.getElementById('ov-rlbl');
+const ovRval     = document.getElementById('ov-rval');
+const ovHint     = document.getElementById('ov-hint');
+const ovBadge    = document.getElementById('ov-level-badge');
+const startBtn   = document.getElementById('startbtn');
+const timeEl     = document.getElementById('time-val');
+const bestEl     = document.getElementById('best-val');
+const tbar       = document.getElementById('tbar');
+const flashEl    = document.getElementById('flash');
+const winBanner  = document.getElementById('win-banner');
+const winTextEl  = document.getElementById('win-text');
+const winSubEl   = document.getElementById('win-sub');
+const tiltDot    = document.getElementById('tilt-dot');
+const tiltInd    = document.getElementById('tilt-ind');
+const levelVal   = document.getElementById('level-val');
+const mainSky    = document.getElementById('main-sky');
+const sbBtn      = document.getElementById('sb-btn');
+const sbOverlay  = document.getElementById('scoreboard');
+const sbTable    = document.getElementById('sb-table');
+const sbCloseBtn = document.getElementById('sb-close-btn');
+const splashEl   = document.getElementById('splash');
+const splashBtn  = document.getElementById('splash-btn');
+const setupEl    = document.getElementById('setup-overlay');
+const setupDone  = document.getElementById('setup-done-btn');
+let mazeEl, ballEl;
+
+/* ════════════════
+   SPLASH
+════════════════ */
+splashBtn.addEventListener('click', async () => {
+  await requestTiltPermission();
+  splashEl.classList.add('gone');
+  setTimeout(() => { setupEl.classList.remove('gone'); }, 500);
+});
+
+/* ════════════════
+   SETUP
+════════════════ */
+let setupStartLevel = 1;
+document.querySelectorAll('.setup-opt').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const group = btn.dataset.group;
+    document.querySelectorAll(`.setup-opt[data-group="${group}"]`).forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const val = parseFloat(btn.dataset.val);
+    if (group === 'sens')       tiltSensMultiplier = val;
+    if (group === 'speed')      GRAVITY_MAG_LIVE   = val;
+    if (group === 'startlevel') setupStartLevel    = val;
+  });
+});
+
+setupDone.addEventListener('click', () => {
+  currentLevel = setupStartLevel;
+  totalElapsed = 0;
+  if (world) world.gravity.y = -GRAVITY_MAG_LIVE;
+  setupEl.classList.add('gone');
+  showFirstOverlay();
+});
+
+/* ════════════════
+   PHYSICS
+════════════════ */
+function initPhysics() {
+  world = new CANNON.World();
+  world.gravity.set(0, -GRAVITY_MAG_LIVE, 0);
+  world.broadphase = new CANNON.NaiveBroadphase();
+  world.solver.iterations = 14;
+  world.allowSleep = false;
+
+  const ballMat = new CANNON.Material('ball');
+  const wallMat = new CANNON.Material('wall');
+  world.addContactMaterial(new CANNON.ContactMaterial(ballMat, wallMat, {
+    friction: BALL_FRICTION, restitution: BALL_RESTITUTION,
+  }));
+
+  ballBody = new CANNON.Body({ mass:1, material:ballMat });
+  ballBody.addShape(new CANNON.Sphere(0.15));
+  ballBody.linearDamping = ballBody.angularDamping = BALL_DAMPING;
+  resetBall();
+  world.addBody(ballBody);
+
+  const floor = new CANNON.Body({ mass:0, material:wallMat });
+  floor.addShape(new CANNON.Plane());
+  floor.quaternion.setFromAxisAngle(new CANNON.Vec3(1,0,0), -Math.PI/2);
+  world.addBody(floor);
+
+  rebuildWallBodies();
+}
+
+function rebuildWallBodies() {
+  while (world.bodies.length > 2) world.remove(world.bodies[world.bodies.length - 1]);
+  const wallMat = new CANNON.Material('wall');
+
+  const activeEl = document.getElementById(`level${currentLevel}-walls`);
+  if (activeEl) {
+    activeEl.querySelectorAll('a-box').forEach(addWallBody(wallMat));
+  }
+  document.querySelectorAll('#maze-pivot > a-box').forEach(addWallBody(wallMat));
+}
+
+function addWallBody(wallMat) {
+  return el => {
+    const p = el.getAttribute('position');
+    const w = parseFloat(el.getAttribute('width')  || 1);
+    const h = parseFloat(el.getAttribute('height') || 1);
+    const d = parseFloat(el.getAttribute('depth')  || 1);
+    const b = new CANNON.Body({ mass:0, material:wallMat });
+    b.addShape(new CANNON.Box(new CANNON.Vec3(w/2, h/2, d/2)));
+    b.position.set(p.x, p.y, p.z);
+    world.addBody(b);
+  };
+}
+
+function setLevel(n) {
+  currentLevel = n;
+  levelVal.textContent = n;
+  document.getElementById('level1-walls').setAttribute('visible', n === 1);
+  document.getElementById('level2-walls').setAttribute('visible', n === 2);
+  rebuildWallBodies();
+  resetBall();
+  /* Level 2 gets a darker tinted sky */
+  mainSky.setAttribute('color', n === 2 ? '#0a0816' : '#08080f');
+}
+
+function resetBall() {
+  if (!ballBody) return;
+  ballBody.position.set(START_POS.x, START_POS.y, START_POS.z);
+  ballBody.velocity.set(0,0,0);
+  ballBody.angularVelocity.set(0,0,0);
+  ballBody.wakeUp();
+}
+
+/* ════════════════
+   INPUT
+════════════════ */
+/* Mouse drag */
+let mouseDown = false, lastMX = 0, lastMY = 0;
+document.addEventListener('mousedown', e => { mouseDown = true; lastMX = e.clientX; lastMY = e.clientY; });
+document.addEventListener('mouseup',   ()  => { mouseDown = false; });
+document.addEventListener('mousemove', e => {
+  if (!mouseDown || gameState !== 'playing') return;
+  /* Drag right → positive Z tilt → maze tilts right → ball rolls right */
+  targetTZ = Math.max(-MAX_TILT_DEG, Math.min(MAX_TILT_DEG, targetTZ - (e.clientX - lastMX) * DWELL_STEP));
+  targetTX = Math.max(-MAX_TILT_DEG, Math.min(MAX_TILT_DEG, targetTX + (e.clientY - lastMY) * DWELL_STEP));
+  lastMX = e.clientX; lastMY = e.clientY;
+});
+
+/* Touch drag */
+let touchPrev = null;
+document.addEventListener('touchstart', e => { touchPrev = e.touches[0]; }, { passive:true });
+document.addEventListener('touchmove', e => {
+  if (!touchPrev || gameState !== 'playing') return;
+  const t = e.touches[0];
+  targetTZ = Math.max(-MAX_TILT_DEG, Math.min(MAX_TILT_DEG, targetTZ - (t.clientX - touchPrev.clientX) * DWELL_STEP));
+  targetTX = Math.max(-MAX_TILT_DEG, Math.min(MAX_TILT_DEG, targetTX + (t.clientY - touchPrev.clientY) * DWELL_STEP));
+  touchPrev = t;
+}, { passive:true });
+document.addEventListener('touchend', () => { touchPrev = null; });
+
+/* Device orientation — head tilt / device tilt control */
+let baseGamma = null, baseBeta = null;
+
+function calibrateTilt(referenceEvent) {
+  baseGamma = referenceEvent?.gamma ?? null;
+  baseBeta  = referenceEvent?.beta  ?? null;
+}
+
+function handleDeviceTilt(e) {
+  if (gameState !== 'playing') return;
+  if (typeof e.gamma !== 'number' || typeof e.beta !== 'number') return;
+  if (baseGamma === null || baseBeta === null) calibrateTilt(e);
+
+  const rawZ = -(e.gamma - baseGamma) * tiltSensMultiplier;
+  const rawX =  (e.beta  - baseBeta)  * tiltSensMultiplier;
+
+  targetTZ = Math.max(-MAX_TILT_DEG, Math.min(MAX_TILT_DEG, rawZ));
+  targetTX = Math.max(-MAX_TILT_DEG, Math.min(MAX_TILT_DEG, rawX));
+}
+
+window.addEventListener('deviceorientation', handleDeviceTilt, { passive:true });
+window.addEventListener('orientationchange', () => calibrateTilt(null), { passive:true });
+
+/* iOS permission */
+async function requestTiltPermission() {
+  if (typeof DeviceOrientationEvent !== 'undefined' &&
+      typeof DeviceOrientationEvent.requestPermission === 'function') {
+    try { await DeviceOrientationEvent.requestPermission(); }
+    catch (_) { /* permission denied or unavailable */ }
+  }
+}
+
+/* ════════════════
+   GAME FLOW
+════════════════ */
+function showFirstOverlay() {
+  ovTitle.innerHTML   = 'MAZE<br>TILT';
+  ovSub.textContent   = 'Tilt your head to rotate the maze. Guide the ball to the green goal.';
+  ovSub.style.display = 'block';
+  ovHint.style.display= 'block';
+  ovRlbl.style.display= 'none';
+  ovRval.style.display= 'none';
+  ovBadge.style.display='none';
+  startBtn.textContent= 'START';
+  overlay.classList.remove('gone');
+}
+
+function startLevel() {
+  won = false; elapsed = 0;
+  tiltX = tiltZ = targetTX = targetTZ = 0;
+  baseGamma = baseBeta = null;
+  calibrateTilt(null);
+  gameState = 'playing';
+  overlay.classList.add('gone');
+  tiltInd.style.display = 'flex';
+  winBanner.classList.remove('show');
+  mazeEl.setAttribute('rotation', '0 0 0');
+  world.gravity.set(0, -GRAVITY_MAG_LIVE, 0);
+  setLevel(currentLevel);
+  playStartSound();
+}
+
+function onWin() {
+  if (won) return; won = true; gameState = 'won';
+  playWinSound();
+  totalElapsed += elapsed;
+
+  /* Flash */
+  flashEl.style.background = '#06d6a0';
+  flashEl.style.opacity    = '0.35';
+  setTimeout(() => { flashEl.style.opacity = '0'; }, 350);
+
+  /* Background color burst then fade back */
+  mainSky.setAttribute('color', '#06d6a0');
+  setTimeout(() => { mainSky.setAttribute('color', '#0a3020'); }, 400);
+  setTimeout(() => { mainSky.setAttribute('color', '#062416'); }, 800);
+  setTimeout(() => { mainSky.setAttribute('color', '#031a10'); }, 1200);
+  setTimeout(() => { mainSky.setAttribute('color', currentLevel >= TOTAL_LEVELS ? '#08080f' : '#0a0816'); }, 1800);
+
+  const isLast = currentLevel >= TOTAL_LEVELS;
+  winTextEl.textContent = isLast ? 'YOU WIN!' : `LEVEL ${currentLevel} CLEAR!`;
+  winSubEl.textContent  = isLast
+    ? `Total: ${totalElapsed.toFixed(1)}s`
+    : `Time: ${elapsed.toFixed(1)}s — Next level incoming!`;
+  winBanner.classList.add('show');
+
+  setTimeout(() => {
+    winBanner.classList.remove('show');
+    tiltInd.style.display = 'none';
+
+    if (isLast) {
+      if (bestTime === null || totalElapsed < bestTime) bestTime = totalElapsed;
+      bestEl.textContent = bestTime.toFixed(1) + 's';
+      scoreEntries.push({ time: totalElapsed });
+      scoreEntries.sort((a,b) => a.time - b.time);
+      renderScoreboard();
+      sbBtn.style.display = 'block';
+
+      ovTitle.textContent   = 'YOU WIN!';
+      ovSub.style.display   = 'none';
+      ovHint.style.display  = 'none';
+      ovRlbl.style.display  = 'block';
+      ovRlbl.textContent    = 'Total time';
+      ovRval.style.display  = 'block';
+      ovRval.textContent    = totalElapsed.toFixed(1) + 's';
+      ovBadge.style.display = 'block';
+      ovBadge.textContent   = 'ALL LEVELS COMPLETE';
+      startBtn.textContent  = 'PLAY AGAIN';
+      currentLevel = 1; totalElapsed = 0;
+      overlay.classList.remove('gone');
+    } else {
+      currentLevel++;
+      ovTitle.textContent   = `LEVEL ${currentLevel}`;
+      ovSub.style.display   = 'block';
+      ovSub.textContent     = 'The maze gets tighter. Stay focused.';
+      ovHint.style.display  = 'none';
+      ovRlbl.style.display  = 'block';
+      ovRlbl.textContent    = 'Level time';
+      ovRval.style.display  = 'block';
+      ovRval.textContent    = elapsed.toFixed(1) + 's';
+      ovBadge.style.display = 'block';
+      ovBadge.textContent   = `Running total: ${totalElapsed.toFixed(1)}s`;
+      startBtn.textContent  = `START LEVEL ${currentLevel}`;
+      overlay.classList.remove('gone');
+    }
+  }, 2200);
+}
+
+/* ════════════════
+   SCOREBOARD
+════════════════ */
+function renderScoreboard() {
+  if (!scoreEntries.length) {
+    sbTable.innerHTML = '<div class="sb-empty">No runs yet. Complete both levels to appear here!</div>';
+    return;
+  }
+  sbTable.innerHTML = scoreEntries.slice(0,10).map((e,i) => `
+    <div class="sb-row">
+      <span class="sb-rank">${i+1}</span>
+      <span class="sb-name">Run ${i+1} <span class="sb-level-tag">ALL LEVELS</span></span>
+      <span class="sb-time">${e.time.toFixed(1)}s</span>
+    </div>`).join('');
+}
+sbBtn.addEventListener('click', () => { renderScoreboard(); sbOverlay.classList.add('show'); });
+sbCloseBtn.addEventListener('click', () => { sbOverlay.classList.remove('show'); });
+startBtn.addEventListener('click', async () => { await requestTiltPermission(); startLevel(); });
+
+/* ════════════════
+   MAIN LOOP
+════════════════ */
+let lastTS = null, tbarPulse = 0;
+function loop(ts) {
+  requestAnimationFrame(loop);
+  if (!mazeEl || !ballEl) return;
+  const dt = lastTS ? Math.min((ts - lastTS) / 1000, 0.05) : 0;
+  lastTS = ts;
+  if (gameState !== 'playing') return;
+
+  elapsed += dt;
+  timeEl.textContent = elapsed.toFixed(1) + 's';
+
+  tiltX += (targetTX - tiltX) * TILT_SMOOTH;
+  tiltZ += (targetTZ - tiltZ) * TILT_SMOOTH;
+  mazeEl.setAttribute('rotation', { x:tiltX, y:0, z:tiltZ });
+
+  const dotX = 27.5 + (tiltZ / MAX_TILT_DEG) * 20;
+  const dotY = 27.5 + (tiltX / MAX_TILT_DEG) * 20;
+  tiltDot.style.left = dotX + 'px';
+  tiltDot.style.top  = dotY + 'px';
+
+  const rx = THREE.MathUtils.degToRad(tiltX);
+  const rz = THREE.MathUtils.degToRad(tiltZ);
+  world.gravity.set(
+    -Math.sin(rz) * GRAVITY_MAG_LIVE,
+    -Math.cos(rx) * Math.cos(rz) * GRAVITY_MAG_LIVE,
+     Math.sin(rx) * GRAVITY_MAG_LIVE
+  );
+
+  world.step(1/60, dt, 3);
+
+  const bp = ballBody.position;
+  ballEl.setAttribute('position', { x:bp.x, y:bp.y, z:bp.z });
+  const bq = ballBody.quaternion;
+  ballEl.object3D.quaternion.set(bq.x, bq.y, bq.z, bq.w);
+
+  if (bp.y < -4) { playResetSound(); resetBall(); }
+
+  const dx = bp.x - GOAL_X, dz = bp.z - GOAL_Z;
+  if (Math.sqrt(dx*dx + dz*dz) < GOAL_XZ_RADIUS && bp.y < 0.6) onWin();
+
+  tbarPulse += dt * 1.8;
+  tbar.style.width = (45 + Math.sin(tbarPulse) * 35) + '%';
+}
+
+/* ════════════════
+   INIT
+════════════════ */
+const scene = document.querySelector('a-scene');
+function init() {
+  mazeEl = document.getElementById('maze-pivot');
+  ballEl = document.getElementById('ball');
+  initPhysics();
+  requestAnimationFrame(loop);
+}
+if (scene.hasLoaded) init();
+else scene.addEventListener('loaded', init);
+</script>
+</body>
+</html>
