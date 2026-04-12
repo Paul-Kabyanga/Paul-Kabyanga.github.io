@@ -223,6 +223,7 @@
     <canvas id="tex-pink"   width="128" height="128"></canvas>
     <canvas id="tex-cyan"   width="128" height="128"></canvas>
     <canvas id="tex-sky"    width="256" height="256"></canvas>
+    <img id="tex-floor" src="woodfloor.jpg">
   </a-assets>
 
   <!-- Sky / environment -->
@@ -235,7 +236,7 @@
   <!-- Floor with texture -->
   <a-plane id="floor"
     rotation="-90 0 0" width="30" height="30"
-    material="src:#tex-sky; repeat:8 8; roughness:0.9"
+    material="src:#tex-floor; repeat:8 8; roughness:0.9"
   ></a-plane>
 
   <!-- Camera rig -->
