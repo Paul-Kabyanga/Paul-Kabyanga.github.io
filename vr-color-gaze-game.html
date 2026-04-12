@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChromaGaze VR</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.2/aframe.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    /* ── Overlay Screens ── */
+    #overlay {
+      position: fixed; inset: 0; z-index: 9999;
+      background: #000;
+      font-family: 'Courier New', monospace;
+      color: #fff;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center;
+      transition: opacity 0.6s;
+    }
+    #overlay.hidden { opacity: 0; pointer-events: none; }
+
+    /* Flash screen */
+    #screen-flash {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 12px;
+    }
+    #screen-flash h1 {
+      font-size: clamp(2rem, 8vw, 4rem);
+      letter-spacing: 0.15em;
+      background: linear-gradient(135deg, #ff4d6d, #f9c74f, #4cc9f0);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+    #screen-flash .subtitle { font-size: 1.1rem; color: #aaa; letter-spacing: 0.3em; margin-top: 8px; }
+    #screen-flash .credits { margin-top: 24px; font-size: 0.85rem; color: #666; line-height: 1.8; }
+    #screen-flash .course  { margin-top: 8px; font-size: 0.75rem; color: #444; }
+
+    /* Setup screen */
+    #screen-setup { display: none; gap: 24px; flex-direction: column; max-width: 420px; width: 90%; }
+    #screen-setup h2 { font-size: 2rem; letter-spacing: 0.1em; color: #f9c74f; margin-bottom: 8px; }
+    .setup-row { display: flex; align-items: center; justify-content: space-between; background: #111; border: 1px solid #333; border-radius: 8px; padding: 14px 18px; }
+    .setup-row label { font-size: 0.9rem; letter-spacing: 0.08em; }
+    .setup-row select, .setup-row input[type=range] { background: #222; color: #fff; border: 1px solid #555; border-radius: 4px; padding: 4px 8px; }
+    .toggle-btn {
+      background: #222; border: 2px solid #4cc9f0; color: #4cc9f0;
+      padding: 6px 18px; border-radius: 20px; cursor: pointer; font-family: inherit;
+      font-size: 0.85rem; letter-spacing: 0.1em; transition: all 0.2s;
+    }
+    .toggle-btn.on { background: #4cc9f0; color: #000; }
+    .btn-start {
+      margin-top: 8px; padding: 16px 32px;
+      background: linear-gradient(135deg, #ff4d6d, #f9c74f);
+      border: none; border-radius: 8px; color: #000;
+      font-size: 1.2rem; font-family: inherit; letter-spacing: 0.2em;
+      cursor: pointer; font-weight: bold; transition: transform 0.15s;
+    }
+    .btn-start:hover { transform: scale(1.04); }
+
+    /* HUD */
+    #hud {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      display: flex; justify-content: space-between; align-items: flex-start;
+      padding: 12px 20px;
+      pointer-events: none;
+    }
+    .hud-box {
+      background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 8px; padding: 8px 16px;
+      font-family: 'Courier New', monospace; color: #fff; font-size: 0.9rem;
+      pointer-events: none;
+    }
+    .hud-box span { color: #f9c74f; font-size: 1.1rem; font-weight: bold; }
+    #hud-timer-bar-wrap { width: 140px; height: 6px; background: #333; border-radius: 3px; margin-top: 4px; }
+    #hud-timer-bar { height: 6px; border-radius: 3px; background: #4cc9f0; transition: width 0.1s linear; }
+
+    /* Target prompt */
+    #target-prompt {
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -170%);
+      z-index: 200; pointer-events: none;
+      font-family: 'Courier New', monospace; font-size: 1.1rem; letter-spacing: 0.15em;
+      text-align: center; background: rgba(0,0,0,0.7);
+      padding: 10px 24px; border-radius: 30px; color: #fff; border: 1px solid #555;
+    }
+    #target-color-swatch {
+      display: inline-block; width: 20px; height: 20px; border-radius: 50%;
+      vertical-align: middle; margin-left: 10px; border: 2px solid #fff;
+    }
+
+    /* Level announce */
+    #level-announce {
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      z-index: 300; pointer-events: none;
+      font-family: 'Courier New', monospace; font-size: clamp(1.4rem,5vw,2.4rem);
+      letter-spacing: 0.2em; color: #f9c74f;
+      background: rgba(0,0,0,0.85); padding: 20px 40px; border-radius: 12px;
+      border: 1px solid #f9c74f; opacity: 0; transition: opacity 0.4s;
+      text-align: center;
+    }
+    #level-announce.show { opacity: 1; }
+
+    /* Game over */
+    #screen-gameover {
+      display: none; flex-direction: column; gap: 20px; max-width: 400px; width: 90%;
+    }
+    #screen-gameover h2 { font-size: 2.5rem; color: #ff4d6d; letter-spacing: 0.1em; }
+    .go-stats { font-size: 1rem; color: #ccc; line-height: 2; }
+    .go-stats span { color: #f9c74f; }
+    .btn-replay {
+      padding: 14px 28px; background: #4cc9f0; border: none;
+      border-radius: 8px; color: #000; font-size: 1.1rem; font-family: inherit;
+      letter-spacing: 0.15em; cursor: pointer; font-weight: bold;
+    }
+    .scoreboard-list { text-align: left; font-size: 0.85rem; color: #888; line-height: 1.8; max-height: 140px; overflow-y: auto; }
+    .scoreboard-list .entry { display: flex; justify-content: space-between; }
+    .scoreboard-list .entry.highlight { color: #f9c74f; }
+
+    #hud { display: none; }
+    #target-prompt { display: none; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════ OVERLAY ═══════════ -->
+<div id="overlay">
+
+  <!-- Flash Screen -->
+  <div id="screen-flash">
+    <h1>CHROMAGAZE</h1>
+    <div class="subtitle">VR COLOUR SELECTION GAME</div>
+    <div class="credits">
+      <div>Student Name: <strong>[YOUR NAME]</strong></div>
+      <div>Student ID: <strong>[STUDENT ID]</strong></div>
+      <div>Instructor: <strong>[INSTRUCTOR NAME]</strong></div>
+    </div>
+    <div class="course">[COURSE CODE] · [INSTITUTION] · 2026</div>
+  </div>
+
+  <!-- Setup Screen -->
+  <div id="screen-setup">
+    <h2>SETUP</h2>
+
+    <div class="setup-row">
+      <label>Starting Level</label>
+      <select id="cfg-level">
+        <option value="1">Level 1 — Easy (5 balls, 8s)</option>
+        <option value="2">Level 2 — Hard (8 balls, 5s)</option>
+      </select>
+    </div>
+
+    <div class="setup-row">
+      <label>Background Music</label>
+      <button class="toggle-btn on" id="btn-music" onclick="toggleMusic()">ON</button>
+    </div>
+
+    <div class="setup-row">
+      <label>Gaze Dwell Time</label>
+      <select id="cfg-dwell">
+        <option value="1500">1.5 s</option>
+        <option value="2000" selected>2 s</option>
+        <option value="2500">2.5 s</option>
+      </select>
+    </div>
+
+    <button class="btn-start" onclick="startGame()">▶ START</button>
+  </div>
+
+  <!-- Game Over Screen -->
+  <div id="screen-gameover">
+    <h2>GAME OVER</h2>
+    <div class="go-stats">
+      Final Score: <span id="go-score">0</span><br>
+      Level Reached: <span id="go-level">1</span><br>
+      Correct Picks: <span id="go-correct">0</span>
+    </div>
+    <div style="margin-top:8px;">
+      <div style="color:#f9c74f;font-size:0.85rem;letter-spacing:0.1em;margin-bottom:6px;">HIGH SCORES</div>
+      <div class="scoreboard-list" id="scoreboard-list"></div>
+    </div>
+    <button class="btn-replay" onclick="replayGame()">PLAY AGAIN</button>
+  </div>
+</div>
+
+<!-- ═══════════ HUD ═══════════ -->
+<div id="hud">
+  <div class="hud-box">
+    SCORE<br><span id="hud-score">0</span>
+  </div>
+  <div class="hud-box" style="text-align:center;">
+    <div id="hud-level">LEVEL 1</div>
+    <div id="hud-timer-bar-wrap"><div id="hud-timer-bar"></div></div>
+  </div>
+  <div class="hud-box" style="text-align:right;">
+    ROUND<br><span id="hud-round">1</span>
+  </div>
+</div>
+
+<div id="target-prompt">
+  LOOK AT: <strong id="target-name">RED</strong>
+  <span id="target-color-swatch"></span>
+</div>
+
+<div id="level-announce" id="level-announce"></div>
+
+<!-- ═══════════ A-FRAME SCENE ═══════════ -->
+<a-scene
+  id="vr-scene"
+  vr-mode-ui="enabled: true"
+  embedded
+  style="position:fixed;inset:0;z-index:1;display:none;"
+>
+  <!-- Assets / placeholder textures -->
+  <a-assets>
+    <!-- Placeholder canvas textures generated in JS -->
+    <canvas id="tex-red"    width="128" height="128"></canvas>
+    <canvas id="tex-green"  width="128" height="128"></canvas>
+    <canvas id="tex-blue"   width="128" height="128"></canvas>
+    <canvas id="tex-yellow" width="128" height="128"></canvas>
+    <canvas id="tex-purple" width="128" height="128"></canvas>
+    <canvas id="tex-orange" width="128" height="128"></canvas>
+    <canvas id="tex-pink"   width="128" height="128"></canvas>
+    <canvas id="tex-cyan"   width="128" height="128"></canvas>
+    <canvas id="tex-sky"    width="256" height="256"></canvas>
+  </a-assets>
+
+  <!-- Sky / environment -->
+  <a-sky id="a-sky" color="#0a0a1a"></a-sky>
+
+  <!-- Ambient + directional light -->
+  <a-light type="ambient" color="#334" intensity="0.8"></a-light>
+  <a-light type="directional" color="#fff" intensity="1.2" position="2 4 -3"></a-light>
+
+  <!-- Floor with texture -->
+  <a-plane id="floor"
+    rotation="-90 0 0" width="30" height="30"
+    material="src:#tex-sky; repeat:8 8; roughness:0.9"
+  ></a-plane>
+
+  <!-- Camera rig -->
+  <a-entity id="rig" position="0 1.6 0">
+    <a-camera id="main-cam" look-controls wasd-controls="enabled:false">
+      <!-- Gaze cursor -->
+      <a-entity cursor="fuse:true; fuseTimeout:2000"
+        id="gaze-cursor"
+        position="0 0 -1"
+        geometry="primitive:ring; radiusInner:0.012; radiusOuter:0.02"
+        material="color:#fff; shader:flat; opacity:0.85"
+        animation__fusing="property:material.opacity;from:0.85;to:0.2;dur:2000;startEvents:fusing"
+        animation__mouseleave="property:material.opacity;from:0.2;to:0.85;dur:100;startEvents:mouseleave"
+      ></a-entity>
+      <!-- Progress ring (gaze dwell indicator) -->
+      <a-entity id="gaze-ring"
+        position="0 0 -1"
+        geometry="primitive:ring; radiusInner:0.023; radiusOuter:0.028; thetaLength:0"
+        material="color:#f9c74f; shader:flat"
+      ></a-entity>
+    </a-camera>
+  </a-entity>
+
+  <!-- Ball container — balls placed/removed dynamically -->
+  <a-entity id="ball-container"></a-entity>
+
+</a-scene>
+
+<!-- ═══════════ AUDIO (placeholders) ═══════════ -->
+<!-- Replace src with real audio files -->
+<audio id="snd-correct" src="" preload="auto"></audio>
+<audio id="snd-wrong"   src="" preload="auto"></audio>
+<audio id="snd-tick"    src="" preload="auto"></audio>
+<audio id="snd-bgm"     src="" preload="auto" loop></audio>
+
+<script>
+/* ═══ CONFIG ═══ */
+const LEVELS = {
+  1: { balls: 5, timeLimit: 8000,  rounds: 5, label: "LEVEL 1 — EASY",  scorePerHit: 10 },
+  2: { balls: 8, timeLimit: 5000,  rounds: 7, label: "LEVEL 2 — HARD",  scorePerHit: 20 },
+};
+
+const COLORS = [
+  { name: "RED",    hex: "#e63946" },
+  { name: "GREEN",  hex: "#2dc653" },
+  { name: "BLUE",   hex: "#4895ef" },
+  { name: "YELLOW", hex: "#f9c74f" },
+  { name: "PURPLE", hex: "#9b5de5" },
+  { name: "ORANGE", hex: "#f4a261" },
+  { name: "PINK",   hex: "#ff70a6" },
+  { name: "CYAN",   hex: "#4cc9f0" },
+];
+
+/* ═══ STATE ═══ */
+let state = {
+  screen: "flash",   // flash | setup | game | gameover
+  level: 1,
+  round: 0,
+  score: 0,
+  correct: 0,
+  targetColor: null,
+  roundActive: false,
+  roundTimer: null,
+  timerStart: 0,
+  timerDuration: 0,
+  gazeTarget: null,
+  gazeDwellTimer: null,
+  gazeDwellDuration: 2000,
+  musicOn: true,
+};
+
+/* ═══ TEXTURES ─ paint canvas placeholders ═══ */
+function paintTextures() {
+  COLORS.forEach(c => {
+    const id = "tex-" + c.name.toLowerCase();
+    const canvas = document.getElementById(id);
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const w = canvas.width, h = canvas.height;
+    // Base color
+    ctx.fillStyle = c.hex;
+    ctx.fillRect(0,0,w,h);
+    // Shine spot
+    const grad = ctx.createRadialGradient(w*0.35, h*0.3, 0, w*0.5, h*0.5, w*0.6);
+    grad.addColorStop(0, "rgba(255,255,255,0.55)");
+    grad.addColorStop(0.5, "rgba(255,255,255,0.0)");
+    grad.addColorStop(1, "rgba(0,0,0,0.3)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0,0,w,h);
+    // Checkerboard for visual texture
+    ctx.globalAlpha = 0.06;
+    ctx.fillStyle = "#fff";
+    for (let x=0; x<w; x+=16) for (let y=0; y<h; y+=16)
+      if (((x/16)+(y/16))%2===0) ctx.fillRect(x,y,16,16);
+    ctx.globalAlpha = 1;
+  });
+
+  // Sky / floor texture
+  const sky = document.getElementById("tex-sky");
+  if (sky) {
+    const ctx = sky.getContext("2d");
+    const w = sky.width, h = sky.height;
+    ctx.fillStyle = "#111";
+    ctx.fillRect(0,0,w,h);
+    ctx.strokeStyle = "#2a2a3a";
+    ctx.lineWidth = 1;
+    for (let i=0; i<w; i+=32) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,h); ctx.stroke(); }
+    for (let i=0; i<h; i+=32) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(w,i); ctx.stroke(); }
+  }
+}
+
+/* ═══ SCREEN TRANSITIONS ═══ */
+function showScreen(name) {
+  ["screen-flash","screen-setup","screen-gameover"].forEach(id => {
+    const el = document.getElementById(id);
+    el.style.display = "none";
+  });
+  const overlay = document.getElementById("overlay");
+  overlay.classList.remove("hidden");
+
+  if (name === "flash") {
+    document.getElementById("screen-flash").style.display = "flex";
+    setTimeout(() => {
+      document.getElementById("screen-flash").style.display = "none";
+      document.getElementById("screen-setup").style.display = "flex";
+    }, 4000);
+  } else if (name === "setup") {
+    document.getElementById("screen-setup").style.display = "flex";
+  } else if (name === "gameover") {
+    document.getElementById("screen-gameover").style.display = "flex";
+    renderScoreboard();
+  }
+}
+
+/* ═══ SETUP ═══ */
+function toggleMusic() {
+  state.musicOn = !state.musicOn;
+  const btn = document.getElementById("btn-music");
+  btn.textContent = state.musicOn ? "ON" : "OFF";
+  btn.classList.toggle("on", state.musicOn);
+}
+
+function startGame() {
+  state.level = parseInt(document.getElementById("cfg-level").value);
+  state.gazeDwellDuration = parseInt(document.getElementById("cfg-dwell").value);
+  state.score = 0;
+  state.correct = 0;
+  state.round = 0;
+
+  // Update cursor fuse timeout
+  const cursor = document.getElementById("gaze-cursor");
+  cursor.setAttribute("cursor", `fuse:true; fuseTimeout:${state.gazeDwellDuration}`);
+  const anim = cursor.getAttribute("animation__fusing");
+  cursor.setAttribute("animation__fusing", `property:material.opacity;from:0.85;to:0.2;dur:${state.gazeDwellDuration};startEvents:fusing`);
+
+  document.getElementById("overlay").classList.add("hidden");
+  document.getElementById("vr-scene").style.display = "block";
+  document.getElementById("hud").style.display = "flex";
+  document.getElementById("target-prompt").style.display = "block";
+
+  if (state.musicOn) tryPlay("snd-bgm");
+
+  announceLevel(LEVELS[state.level].label, () => startRound());
+}
+
+/* ═══ LEVEL ANNOUNCE ═══ */
+function announceLevel(text, cb) {
+  const el = document.getElementById("level-announce");
+  el.textContent = text;
+  el.classList.add("show");
+  setTimeout(() => {
+    el.classList.remove("show");
+    setTimeout(cb, 400);
+  }, 2200);
+}
+
+/* ═══ ROUND LOGIC ═══ */
+function startRound() {
+  const cfg = LEVELS[state.level];
+  state.round++;
+  if (state.round > cfg.rounds) {
+    // Advance to next level or end
+    if (state.level < 2) {
+      state.level = 2;
+      state.round = 0;
+      announceLevel(LEVELS[2].label, () => startRound());
+    } else {
+      endGame();
+    }
+    return;
+  }
+
+  state.roundActive = true;
+  state.gazeTarget = null;
+
+  // Pick a random subset of colors
+  const shuffled = shuffle([...COLORS]).slice(0, cfg.balls);
+  // Pick target
+  state.targetColor = shuffled[Math.floor(Math.random() * shuffled.length)];
+
+  updateHUD();
+  updatePrompt();
+  spawnBalls(shuffled);
+  startTimer(cfg.timeLimit);
+}
+
+function shuffle(arr) {
+  for (let i=arr.length-1; i>0; i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]] = [arr[j],arr[i]];
+  }
+  return arr;
+}
+
+/* ═══ BALLS ═══ */
+function spawnBalls(colors) {
+  const container = document.getElementById("ball-container");
+  container.innerHTML = ""; // clear old
+
+  const n = colors.length;
+  const radius = 3.5; // arc radius
+  const angleStep = (Math.PI * 1.1) / (n - 1);
+  const startAngle = -Math.PI * 0.55;
+
+  colors.forEach((color, i) => {
+    const angle = startAngle + i * angleStep;
+    const x = Math.sin(angle) * radius;
+    const z = -Math.cos(angle) * radius - 1;
+    const y = 1.6; // eye level
+
+    const texId = "tex-" + color.name.toLowerCase();
+
+    // Sphere
+    const sphere = document.createElement("a-sphere");
+    sphere.setAttribute("radius", "0.45");
+    sphere.setAttribute("position", `${x} ${y} ${z}`);
+    sphere.setAttribute("material", `src:#${texId}; roughness:0.3; metalness:0.1`);
+    sphere.setAttribute("data-color", color.name);
+    sphere.setAttribute("class", "color-ball");
+
+    // Idle float animation
+    sphere.setAttribute("animation", `property:position; to:${x} ${y+0.18} ${z}; dur:${1800+i*200}; dir:alternate; loop:true; easing:easeInOutSine`);
+
+    // Label underneath
+    const label = document.createElement("a-text");
+    label.setAttribute("value", color.name);
+    label.setAttribute("position", `${x} ${y - 0.62} ${z}`);
+    label.setAttribute("align", "center");
+    label.setAttribute("color", "#fff");
+    label.setAttribute("width", "2.5");
+    label.setAttribute("font", "mozillavr");
+
+    // Glow ring behind sphere
+    const ring = document.createElement("a-torus");
+    ring.setAttribute("position", `${x} ${y} ${z}`);
+    ring.setAttribute("radius", "0.52");
+    ring.setAttribute("radius-tubular", "0.025");
+    ring.setAttribute("color", color.hex);
+    ring.setAttribute("material", `color:${color.hex}; emissive:${color.hex}; emissiveIntensity:0.4`);
+    ring.setAttribute("rotation", "90 0 0");
+    ring.setAttribute("class", "color-ring");
+    ring.setAttribute("data-color", color.name);
+
+    // Events
+    sphere.addEventListener("mouseenter", () => onBallEnter(color));
+    sphere.addEventListener("mouseleave", () => onBallLeave());
+    sphere.addEventListener("click", () => onBallClick(color)); // fuse click
+
+    ring.addEventListener("mouseenter", () => onBallEnter(color));
+    ring.addEventListener("mouseleave", () => onBallLeave());
+    ring.addEventListener("click", () => onBallClick(color));
+
+    container.appendChild(sphere);
+    container.appendChild(ring);
+    container.appendChild(label);
+  });
+}
+
+/* ═══ GAZE EVENTS ═══ */
+let gazeRingInterval = null;
+
+function onBallEnter(color) {
+  if (!state.roundActive) return;
+  state.gazeTarget = color;
+  startGazeRing();
+}
+
+function onBallLeave() {
+  state.gazeTarget = null;
+  stopGazeRing();
+}
+
+function onBallClick(color) {
+  if (!state.roundActive) return;
+  stopGazeRing();
+  resolveChoice(color);
+}
+
+function startGazeRing() {
+  stopGazeRing();
+  const ring = document.getElementById("gaze-ring");
+  const dur = state.gazeDwellDuration;
+  const start = performance.now();
+  gazeRingInterval = setInterval(() => {
+    const pct = Math.min((performance.now() - start) / dur, 1);
+    ring.setAttribute("geometry", `primitive:ring; radiusInner:0.023; radiusOuter:0.028; thetaLength:${pct*360}`);
+    if (pct >= 1) {
+      clearInterval(gazeRingInterval);
+      gazeRingInterval = null;
+      if (state.gazeTarget) resolveChoice(state.gazeTarget);
+    }
+  }, 50);
+}
+
+function stopGazeRing() {
+  if (gazeRingInterval) { clearInterval(gazeRingInterval); gazeRingInterval = null; }
+  const ring = document.getElementById("gaze-ring");
+  ring.setAttribute("geometry", "primitive:ring; radiusInner:0.023; radiusOuter:0.028; thetaLength:0");
+}
+
+/* ═══ RESOLVE CHOICE ═══ */
+function resolveChoice(color) {
+  if (!state.roundActive) return;
+  state.roundActive = false;
+  clearInterval(state.roundTimer);
+  stopGazeRing();
+
+  const correct = color.name === state.targetColor.name;
+
+  if (correct) {
+    state.score += LEVELS[state.level].scorePerHit;
+    state.correct++;
+    tryPlay("snd-correct");
+    flashBalls("correct", color.name);
+  } else {
+    tryPlay("snd-wrong");
+    flashBalls("wrong", color.name);
+  }
+
+  // Collision: scale target ball on correct
+  if (correct) {
+    document.querySelectorAll(".color-ball").forEach(el => {
+      if (el.getAttribute("data-color") === color.name) {
+        el.setAttribute("animation__hit", "property:scale; from:1 1 1; to:1.5 1.5 1.5; dur:300; dir:alternate; loop:2");
+      }
+    });
+  }
+
+  updateHUD();
+  setTimeout(() => startRound(), 1400);
+}
+
+function flashBalls(outcome, pickedName) {
+  document.querySelectorAll(".color-ball, .color-ring").forEach(el => {
+    const name = el.getAttribute("data-color");
+    if (name === pickedName) {
+      el.setAttribute("material", outcome === "correct"
+        ? "color:#2dc653; emissive:#2dc653; emissiveIntensity:1"
+        : "color:#e63946; emissive:#e63946; emissiveIntensity:1");
+    }
+    if (name === state.targetColor.name && outcome === "wrong") {
+      el.setAttribute("material", "color:#2dc653; emissive:#2dc653; emissiveIntensity:0.8");
+    }
+  });
+}
+
+/* ═══ TIMER ═══ */
+function startTimer(duration) {
+  state.timerStart = performance.now();
+  state.timerDuration = duration;
+  tryPlay("snd-tick");
+
+  state.roundTimer = setInterval(() => {
+    const elapsed = performance.now() - state.timerStart;
+    const pct = Math.max(0, 1 - elapsed / duration);
+    const bar = document.getElementById("hud-timer-bar");
+    bar.style.width = (pct * 100) + "%";
+    bar.style.background = pct > 0.4 ? "#4cc9f0" : pct > 0.2 ? "#f9c74f" : "#e63946";
+
+    if (elapsed >= duration) {
+      clearInterval(state.roundTimer);
+      if (state.roundActive) {
+        state.roundActive = false;
+        stopGazeRing();
+        tryPlay("snd-wrong");
+        setTimeout(() => startRound(), 1200);
+      }
+    }
+  }, 60);
+}
+
+/* ═══ HUD ═══ */
+function updateHUD() {
+  document.getElementById("hud-score").textContent = state.score;
+  document.getElementById("hud-level").textContent = "LVL " + state.level;
+  document.getElementById("hud-round").textContent = state.round + "/" + LEVELS[state.level].rounds;
+}
+
+function updatePrompt() {
+  const c = state.targetColor;
+  document.getElementById("target-name").textContent = c.name;
+  document.getElementById("target-color-swatch").style.background = c.hex;
+}
+
+/* ═══ END GAME ═══ */
+function endGame() {
+  clearInterval(state.roundTimer);
+  stopGazeRing();
+  document.getElementById("hud").style.display = "none";
+  document.getElementById("target-prompt").style.display = "none";
+  document.getElementById("vr-scene").style.display = "none";
+
+  // Stop audio
+  document.getElementById("snd-bgm").pause();
+
+  // Save to scoreboard
+  const scores = JSON.parse(localStorage.getItem("chromagaze_scores") || "[]");
+  scores.push({ score: state.score, level: state.level, correct: state.correct, date: new Date().toLocaleDateString() });
+  scores.sort((a,b) => b.score - a.score);
+  localStorage.setItem("chromagaze_scores", JSON.stringify(scores.slice(0, 10)));
+
+  document.getElementById("go-score").textContent   = state.score;
+  document.getElementById("go-level").textContent   = state.level;
+  document.getElementById("go-correct").textContent = state.correct;
+
+  showScreen("gameover");
+}
+
+function renderScoreboard() {
+  const scores = JSON.parse(localStorage.getItem("chromagaze_scores") || "[]");
+  const list = document.getElementById("scoreboard-list");
+  if (!scores.length) { list.innerHTML = '<div style="color:#555">No scores yet.</div>'; return; }
+  list.innerHTML = scores.map((s,i) =>
+    `<div class="entry ${s.score === state.score ? 'highlight' : ''}">
+      <span>${i+1}. ${s.date}</span><span>Lvl ${s.level} — <b>${s.score} pts</b></span>
+    </div>`
+  ).join("");
+}
+
+function replayGame() {
+  document.getElementById("ball-container").innerHTML = "";
+  document.getElementById("vr-scene").style.display = "none";
+  showScreen("setup");
+}
+
+/* ═══ AUDIO HELPER ═══ */
+function tryPlay(id) {
+  const el = document.getElementById(id);
+  if (!el || !el.src) return;
+  el.currentTime = 0;
+  el.play().catch(() => {});
+}
+
+/* ═══ BOOT ═══ */
+window.addEventListener("load", () => {
+  paintTextures();
+  showScreen("flash");
+});
+</script>
+</body>
+</html>
